@@ -72,8 +72,8 @@ NOMI = {
     "QN-Il Giorno": "Il Giorno",
     "CORRIERE Umbria/AR/SI": "Corriere dell’Umbria",
     "NUOVA DI VENEZIA E ME. (LA)": "La Nuova di Venezia e Mestre",
-    "GAZZETTA DEL MEZZOGIORNO(LA)": "La Gazzetta del Mezzogiorno",
-    "VERITA'(LA)": "La Verità",
+    "GAZZETTA DEL MEZZOGIORNO (LA)": "La Gazzetta del Mezzogiorno",
+    "VERITA' (LA)": "La Verità",
     "LIBERTA'": "Libertà",
     "ALTOADIGE": "Alto Adige",
     "ITALIA OGGI": "ItaliaOggi",
@@ -84,6 +84,12 @@ NOMI = {
     "SECOLO XIX (IL)": "Il Secolo XIX",
 }
 MINUSCOLE = {"di", "del", "della", "delle", "dei", "degli", "e", "ed", "da", "in"}
+
+
+def normalizza_testata(raw: str) -> str:
+    """ADS non scrive sempre i nomi allo stesso modo (es. 'GAZZETTA DEL MEZZOGIORNO(LA)' e
+    'GAZZETTA DEL MEZZOGIORNO (LA)'): uno spazio prima della parentesi e niente spazi doppi."""
+    return re.sub(r"\s+", " ", re.sub(r"\s*\(", " (", raw)).strip()
 
 
 def nome_leggibile(raw: str) -> str:
@@ -156,7 +162,7 @@ def leggi(path: Path, mese: int, anno: int) -> pd.DataFrame:
             & (pd.to_numeric(df[COL_MESE], errors="coerce") == mese)]
     df = df[~df[COL_TESTATA].astype(str).str.contains(ESCLUDI)]
     out = pd.DataFrame({
-        "testata": df[COL_TESTATA].astype(str).str.strip(),
+        "testata": df[COL_TESTATA].astype(str).map(normalizza_testata),
         "anno": anno,
         "mese": mese,
         **{k: df[cols].apply(pd.to_numeric, errors="coerce").sum(axis=1, min_count=1)

@@ -376,7 +376,7 @@ function tempo(){
   const attive = serieAttive();
   document.getElementById("tit-tempo").textContent =
     !sel.length ? "Com’è andata dal 2021"
-    : sel.length === 1 ? `Com’è andato ${D.testate[sel[0]].n} dal 2021`
+    : sel.length === 1 ? `${D.testate[sel[0]].n}, dal 2021`   // "Com’è andato…" non concorda con i nomi femminili
     : "Com’è andata dal 2021, giornale per giornale";
   document.getElementById("lead-tempo").textContent = !sel.length
     ? "Media giornaliera mese per mese, somma di tutti i giornali dell’elenco. Evidenzia uno o più giornali per vederne l’andamento; tocca o passa sopra le linee per leggere i valori."
