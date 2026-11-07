@@ -1,0 +1,57 @@
+name: Dati ADS mensili
+
+on:
+  schedule:
+    # 1 e 15 di ogni mese alle 7:00 UTC: se ADS ha pubblicato un mese nuovo lo elabora, altrimenti non fa nulla
+    - cron: "0 7 1,15 * *"
+  workflow_dispatch:
+    inputs:
+      mese:
+        description: "Mese (vuoto = ultimo disponibile)"
+        required: false
+      anno:
+        description: "Anno (vuoto = ultimo disponibile)"
+        required: false
+      force:
+        description: "Rigenera anche se già fatto"
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+
+jobs:
+  aggiorna:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+          cache: pip
+
+      - run: pip install -r requirements.txt
+
+      - name: Scarica dati e genera grafici
+        env:
+          MESE: ${{ inputs.mese }}
+          ANNO: ${{ inputs.anno }}
+          FORCE: ${{ inputs.force }}
+        run: |
+          ARGS=""
+          if [ -n "$MESE" ] && [ -n "$ANNO" ]; then ARGS="--mese $MESE --anno $ANNO"; fi
+          if [ "$FORCE" = "true" ]; then ARGS="$ARGS --force"; fi
+          python ads_diffusione.py $ARGS
+
+      - name: Salva i risultati nel repository
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898299+github-actions[bot]@users.noreply.github.com"
+          git add dati grafici
+          if git diff --cached --quiet; then
+            echo "Nessun dato nuovo."
+          else
+            git commit -m "Dati ADS aggiornati $(date +%Y-%m-%d)"
+            git push
+          fi
