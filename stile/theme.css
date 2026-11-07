@@ -1,0 +1,112 @@
+/* ============================================================
+   IL POST — token di stile per grafici e mappe
+   Colore portante: azzurro della "S" del logo, #17B4D4
+   Mobile prima di tutto (si progetta a 360 px) e sempre con la versione scura.
+   ============================================================ */
+:root{
+  color-scheme: light dark;
+  /* brand */
+  --azzurro:#17B4D4;   /* serie principale, barre singole */
+  --giallo:#FFE725;    /* evidenziazione puntuale (sfondo di un'etichetta), mai per serie */
+  --su-giallo:#111110; /* testo sopra il giallo, uguale nei due temi */
+  --rosso:#C90101;     /* un solo valore da segnalare, con parsimonia */
+  --ink:#111110;       /* titoli */
+  --testo:#3a3a38;     /* sommario */
+  --muted:#6b6b6b;     /* etichette assi, legende */
+  --fonte:#8a8a87;     /* riga della fonte (abbastanza scura da leggersi su telefono) */
+  --griglia:#eeeeee;   /* griglia orizzontale */
+  --asse:#d9d9d9;      /* linea dell'asse x */
+  --hair:#e6e4df;      /* filetti */
+  --bg:#ffffff;
+  --sfondo-serie:#cfcfcf; /* serie di contesto, in grigio */
+  --land:#f4f2ec;      /* terre nelle mappe */
+  --confine:#d8d4ca;   /* confini nelle mappe */
+  --nodata:#e9e7e2;    /* dato mancante */
+  --tip-bg:#ffffff;
+  --tip-ombra:0 4px 16px rgba(0,0,0,.12);
+
+  /* sequenziale azzurra, 7 classi: valori bassi vicini allo sfondo, alti contrastati */
+  --c1:#e3f5fa; --c2:#b3e6f1; --c3:#74d2e6; --c4:#2fbdd9;
+  --c5:#17B4D4; --c6:#0e7e9b; --c7:#0a4f63;
+
+  /* divergente: rosso <- neutro -> azzurro/petrolio */
+  --d1:#8f0a0a; --d2:#c94a3a; --d3:#eab0a6; --d4:#f2f1ee;
+  --d5:#9fdcec; --d6:#17B4D4; --d7:#0a4f63;
+
+  /* categorica, nell'ordine d'uso */
+  --cat1:#17B4D4; --cat2:#0e7e9b; --cat3:#f0a830;
+  --cat4:#C90101; --cat5:#6b6b6b; --cat6:#9ec9d8;
+
+  /* tipografia */
+  --serif:"Iowan Old Style","Palatino Linotype",Palatino,Georgia,"Times New Roman",serif;
+  --sans:-apple-system,BlinkMacSystemFont,"Segoe UI",Inter,Roboto,Helvetica,Arial,sans-serif;
+
+  /* misure mobile */
+  --etichetta:12px;    /* minimo per assi e legende: sotto non si legge sul telefono */
+  --altezza-grafico:clamp(280px,70vw,440px);
+}
+
+/* ---------- tema scuro ----------
+   Stessi nomi, valori diversi: il codice usa solo var(--…) e si adatta da solo.
+   L'azzurro resta quello del marchio; cambiano i colori che sul nero non si leggono. */
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --rosso:#ff5a4f; --ink:#f2f1ee; --testo:#c9c8c3; --muted:#a3a29d; --fonte:#8c8b86;
+    --griglia:#2c2c2a; --asse:#4a4a46; --hair:#363632; --bg:#161615; --sfondo-serie:#4a4a46;
+    --land:#22221f; --confine:#3d3d39; --nodata:#2f2f2c;
+    --tip-bg:#242422; --tip-ombra:0 4px 16px rgba(0,0,0,.5);
+    --c1:#15343d; --c2:#145466; --c3:#0e7e9b; --c4:#17B4D4; --c5:#4fc8e0; --c6:#8fdcec; --c7:#d2f2f9;
+    --d1:#ff8a7a; --d2:#d9574a; --d3:#7a2a24; --d4:#2e2e2b; --d5:#145466; --d6:#17B4D4; --d7:#9fe3f2;
+    --cat2:#7fd6ea; --cat4:#ff5a4f; --cat5:#a3a29d; --cat6:#3f7f92;
+  }
+}
+:root[data-theme="dark"]{
+    --rosso:#ff5a4f; --ink:#f2f1ee; --testo:#c9c8c3; --muted:#a3a29d; --fonte:#8c8b86;
+    --griglia:#2c2c2a; --asse:#4a4a46; --hair:#363632; --bg:#161615; --sfondo-serie:#4a4a46;
+    --land:#22221f; --confine:#3d3d39; --nodata:#2f2f2c;
+    --tip-bg:#242422; --tip-ombra:0 4px 16px rgba(0,0,0,.5);
+    --c1:#15343d; --c2:#145466; --c3:#0e7e9b; --c4:#17B4D4; --c5:#4fc8e0; --c6:#8fdcec; --c7:#d2f2f9;
+    --d1:#ff8a7a; --d2:#d9574a; --d3:#7a2a24; --d4:#2e2e2b; --d5:#145466; --d6:#17B4D4; --d7:#9fe3f2;
+    --cat2:#7fd6ea; --cat4:#ff5a4f; --cat5:#a3a29d; --cat6:#3f7f92;
+}
+
+/* ---------- pagina e contenitore ---------- */
+html,body{background:var(--bg);color:var(--ink);margin:0}
+.ilpost-chart{box-sizing:border-box;max-width:720px;margin:0 auto;padding:16px 16px 12px;font-family:var(--sans);
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+.ilpost-canvas{position:relative;width:100%;height:var(--altezza-grafico)}
+.ilpost-scroll{overflow-x:auto;-webkit-overflow-scrolling:touch}   /* tabelle e grafici larghi: scorrono qui, mai la pagina */
+.ilpost-chart svg,.ilpost-chart img,.ilpost-chart canvas{max-width:100%}
+
+/* ---------- blocco editoriale: intestazione (titolo + logo), sommario, fonte. Niente occhiello. ---------- */
+.ilpost-head{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin:0 0 8px}
+.ilpost-head .ilpost-title{margin:0;flex:1;min-width:0}
+.ilpost-logo{flex:none;height:14px;width:auto;margin-top:6px;display:block;opacity:.9}   /* piccolo: firma, non protagonista */
+/* due loghi nell'HTML, se ne vede uno: positivo su chiaro, negativo su scuro */
+.ilpost-logo--scuro{display:none}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]) .ilpost-logo--chiaro{display:none}
+  :root:not([data-theme="light"]) .ilpost-logo--scuro{display:block}
+}
+:root[data-theme="dark"] .ilpost-logo--chiaro{display:none}
+:root[data-theme="dark"] .ilpost-logo--scuro{display:block}
+
+.ilpost-title{font-family:var(--serif);font-weight:700;font-size:clamp(21px,5.6vw,34px);
+  line-height:1.12;letter-spacing:-.01em;margin:0 0 10px;color:var(--ink);text-wrap:balance}
+.ilpost-lead{font-family:var(--sans);font-size:15px;color:var(--testo);margin:0 0 14px;line-height:1.45;max-width:64ch}
+.ilpost-src{font-family:var(--sans);font-size:12px;color:var(--fonte);margin-top:8px;line-height:1.4}
+.ilpost-legend{display:flex;flex-wrap:wrap;gap:4px 14px;font-size:13px;color:var(--ink);margin:0 0 8px}
+.ilpost-legend span::before{content:"";display:inline-block;width:10px;height:10px;border-radius:50%;
+  background:var(--c,var(--azzurro));margin-right:6px;vertical-align:-1px}
+.ilpost-note{font-size:13px;color:var(--testo);line-height:1.4}
+.ilpost-tip{background:var(--tip-bg);border:0;border-radius:6px;box-shadow:var(--tip-ombra);
+  font-family:var(--sans);font-size:13px;color:var(--ink);padding:8px 10px;max-width:min(260px,80vw)}
+.ilpost-mark{background:var(--giallo);color:var(--su-giallo);padding:0 3px}   /* il giallo vale solo come sfondo */
+/* controlli (filtri, selettori): bersagli da dito */
+.ilpost-chart button,.ilpost-chart select,.ilpost-chart input{min-height:44px;font:inherit;font-size:15px;
+  color:var(--ink);background:var(--bg);border:1px solid var(--hair);border-radius:6px;padding:0 12px}
+
+@media (max-width:480px){
+  .ilpost-logo{height:12px;margin-top:4px}
+  .ilpost-lead{font-size:14px}
+}

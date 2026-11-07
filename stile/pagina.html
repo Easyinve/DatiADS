@@ -1,0 +1,314 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Quante copie vendono i quotidiani italiani</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Roboto+Mono:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+/*__CSS__*/
+
+/* ---------- aggiunte per questa pagina (toni dei grafici Midterm) ---------- */
+:root{--mono:"Roboto Mono",ui-monospace,Menlo,Consolas,monospace;--pos:var(--cat2);--neg:var(--d2);
+  --pannello:var(--bg);--ombra:0 6px 22px rgba(30,50,60,.10)}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){--neg:var(--d1);--ombra:0 6px 22px rgba(0,0,0,.45)}}
+:root[data-theme="dark"]{--neg:var(--d1);--ombra:0 6px 22px rgba(0,0,0,.45)}
+body{font-family:var(--sans)}
+.ilpost-chart{max-width:760px}
+.sezione{margin:26px 0 0;padding:16px 14px 14px;border-radius:14px;background:var(--pannello);
+  box-shadow:var(--ombra);border:1px solid var(--hair)}
+.sezione h3{font-family:var(--serif);font-weight:700;font-size:clamp(19px,4.6vw,24px);line-height:1.15;margin:0 0 6px;color:var(--ink)}
+.sezione .ilpost-lead{margin-bottom:10px}
+
+/* selettore, sempre a portata di dito */
+.scegli{position:sticky;top:0;z-index:5;background:var(--bg);padding:10px 0 8px;margin:4px 0 0;
+  display:flex;gap:10px;align-items:center;flex-wrap:wrap;border-bottom:1px solid var(--hair)}
+.scegli label{font-size:14px;color:var(--testo)}
+.scegli select{flex:1;min-width:0;max-width:340px}
+
+/* barre orizzontali in HTML: si adattano alla larghezza e al tema da sole */
+.intest,.riga{display:grid;grid-template-columns:minmax(0,10.5em) minmax(0,1fr) 4.4em;align-items:center;column-gap:8px}
+.con-extra .intest,.con-extra .riga{grid-template-columns:minmax(0,9.5em) minmax(0,1fr) 4.4em 4.6em}
+.intest{font-size:12px;color:var(--muted);padding:0 0 6px;border-bottom:1px solid var(--asse);line-height:1.2}
+.intest span{text-align:right}
+.intest span:first-child,.intest span:nth-child(2){text-align:left}
+.riga{min-height:26px;padding:2px 0;cursor:pointer;border-bottom:1px solid var(--griglia);-webkit-tap-highlight-color:transparent}
+.riga .n{font-size:13px;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.riga .n em{font-style:normal}
+.riga .b{display:flex;align-items:center;gap:6px;min-width:0}
+.riga .b i{display:block;height:14px;border-radius:0 2px 2px 0;background:var(--azzurro);
+  width:calc(var(--p) * (100% - 4.8em));min-width:1px;transition:opacity .2s}
+.riga .b span{font-family:var(--mono);font-size:12px;color:var(--testo);white-space:nowrap}
+.riga .v{font-family:var(--mono);font-size:12px;text-align:right;white-space:nowrap}
+.riga .v.ex{font-weight:300}
+.pos{color:var(--pos)} .neg{color:var(--neg)} .nd{color:var(--muted);font-style:italic;font-family:var(--sans)}
+.evid .riga .b i{opacity:.28}
+.evid .riga.sel .b i{opacity:1}
+.riga.sel .n{font-weight:700}
+.riga.sel .n em{font-style:normal;background:var(--giallo);color:var(--su-giallo);padding:0 3px}
+.riga:hover .n{text-decoration:underline;text-decoration-color:var(--asse)}
+.totale{font-size:13px;color:var(--testo);margin:10px 0 0}
+.totale b{font-family:var(--mono);font-weight:500}
+
+/* andamento nel tempo */
+.numeri{display:flex;flex-wrap:wrap;gap:14px 24px;margin:4px 0 12px}
+.numero{flex:1 1 140px;min-width:0}
+.numero .v{font-family:var(--mono);font-weight:300;font-size:clamp(28px,8vw,40px);letter-spacing:-.02em;line-height:1;color:var(--ink)}
+.numero .l{font-size:13px;color:var(--testo);line-height:1.3;margin-top:4px}
+.numero .l i{display:inline-block;width:18px;height:4px;border-radius:2px;margin-right:6px;vertical-align:3px}
+.numero .d{font-family:var(--mono);font-size:13px}
+.linee{position:relative;width:100%;height:clamp(230px,58vw,300px);margin-top:4px}
+.linee + .tit-linee{margin-top:20px}
+.tit-linee{font-size:14px;font-weight:600;color:var(--ink);margin:6px 0 2px}
+.linee svg{display:block;overflow:visible}
+.ax text{font-family:var(--mono);font-size:12px;fill:var(--muted)}
+.ax .domain{stroke:var(--asse)} .ax line{stroke:var(--asse)}
+.grid line{stroke:var(--griglia)}
+.l-princ{fill:none;stroke:var(--azzurro);stroke-width:3;stroke-linejoin:round}
+.l-sec{fill:none;stroke:var(--cat5);stroke-width:2;stroke-linejoin:round;stroke-dasharray:1 0}
+.alone{fill:none;stroke:var(--pannello);stroke-width:7;opacity:.85}
+.ultimo{fill:var(--pannello);stroke-width:2.5}
+.etich{font-family:var(--sans);font-size:12px}
+.guida{stroke:var(--muted);stroke-dasharray:2 4}
+.tip{position:absolute;pointer-events:none;background:var(--tip-bg);color:var(--ink);border-radius:10px;
+  box-shadow:var(--tip-ombra);font-size:13px;padding:8px 10px;line-height:1.45;opacity:0;
+  border-left:4px solid var(--azzurro);white-space:nowrap;z-index:3;transition:opacity .12s}
+.tip .m{color:var(--muted);font-size:12px}
+.tip .mono{font-family:var(--mono)}
+@media (max-width:480px){
+  .sezione{padding:14px 10px 12px;margin-top:20px}
+  /* sul telefono: nome e variazioni sulla prima riga, barra a tutta larghezza sotto */
+  .intest,.riga{grid-template-columns:minmax(0,1fr) 4.2em;grid-template-areas:"n v" "b b";row-gap:2px}
+  .con-extra .intest,.con-extra .riga{grid-template-columns:minmax(0,1fr) 4.2em 4.4em;grid-template-areas:"n v ex" "b b b"}
+  .riga{padding:5px 0 6px}
+  .riga .n{grid-area:n} .riga .b{grid-area:b} .riga .v{grid-area:v} .riga .v.ex{grid-area:ex}
+  .intest span:nth-child(1){grid-area:n} .intest span:nth-child(2){display:none}
+  .intest span:nth-child(3){grid-area:v} .intest span:nth-child(4){grid-area:ex}
+  .riga .b i{height:12px}
+  .riga .b span,.riga .v{font-size:12px}
+}
+</style>
+</head>
+<body>
+<div class="ilpost-chart">
+  <div class="ilpost-head">
+    <h2 class="ilpost-title">Quante copie vendono i quotidiani italiani</h2>
+    <img class="ilpost-logo ilpost-logo--chiaro" alt="Il Post" src="__LOGO_CHIARO__">
+    <img class="ilpost-logo ilpost-logo--scuro" alt="Il Post" src="__LOGO_SCURO__">
+  </div>
+  <p class="ilpost-lead" id="sommario"></p>
+
+  <div class="scegli">
+    <label for="sel">Evidenzia un giornale</label>
+    <select id="sel"></select>
+  </div>
+
+  <section class="sezione" id="sez-ip">
+    <h3>Diffusione individuale pagata</h3>
+    <p class="ilpost-lead" id="lead-ip"></p>
+    <div id="barre-ip"></div>
+    <p class="totale" id="tot-ip"></p>
+  </section>
+
+  <section class="sezione con-extra" id="sez-d30">
+    <h3>Copie digitali vendute ad almeno il 30% del prezzo</h3>
+    <p class="ilpost-lead" id="lead-d30"></p>
+    <div id="barre-d30"></div>
+    <p class="totale" id="tot-d30"></p>
+  </section>
+
+  <section class="sezione" id="sez-tempo">
+    <h3 id="tit-tempo"></h3>
+    <p class="ilpost-lead">Media giornaliera mese per mese, da gennaio 2021. Tocca o passa sopra le linee per leggere i valori.</p>
+    <div class="numeri" id="numeri"></div>
+    <p class="tit-linee">Diffusione individuale pagata</p>
+    <div class="linee" id="linee-ip"></div>
+    <p class="tit-linee">Copie digitali</p>
+    <div class="linee" id="linee-d30"></div>
+  </section>
+
+  <p class="ilpost-note">Diffusione individuale pagata: copie cartacee vendute in edicola, abbonamenti cartacei e copie digitali vendute ad almeno il 30% del prezzo ufficiale (colonne 2, 3 e 4a dei dati ADS). Abbonamenti superscontati: copie digitali vendute tra il 10% e il 30% del prezzo (colonna 4b). Sono esclusi i quotidiani sportivi.</p>
+  <p class="ilpost-src">Elaborazione del Post su dati ADS – Accertamenti Diffusione Stampa (dati DMS mensili). Aggiornato al <span id="agg"></span>.</p>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/d3@7.9.0/dist/d3.min.js"></script>
+<script>
+const D = /*__DATA__*/null;
+
+const MESI = ["gen","feb","mar","apr","mag","giu","lug","ago","set","ott","nov","dic"];
+const MESI_L = ["gennaio","febbraio","marzo","aprile","maggio","giugno","luglio","agosto","settembre","ottobre","novembre","dicembre"];
+// punto delle migliaia anche sotto 10.000 (Intl in italiano scrive "7024")
+const num = v => { const n = Math.round(v); return (n < 0 ? "−" : "") + String(Math.abs(n)).replace(/\B(?=(\d{3})+(?!\d))/g, "."); };
+const nf = {format: num};
+const pct = v => (v > 0 ? "+" : v < 0 ? "−" : "") + Math.abs(v).toLocaleString("it-IT",{minimumFractionDigits:1,maximumFractionDigits:1}) + "%";
+const meseCorto = i => { const [y,m] = D.mesi[i].split("-").map(Number); return MESI[m-1] + " " + y; };
+const meseLungo = i => { const [y,m] = D.mesi[i].split("-").map(Number); return MESI_L[m-1] + " " + y; };
+const U = D.mesi.length - 1;                 // ultimo mese
+const var12 = (s, i) => (i >= 12 && s[i] != null && s[i-12]) ? (s[i] / s[i-12] - 1) * 100 : null;
+const cls = v => v == null ? "nd" : v >= 0 ? "pos" : "neg";
+
+let sel = D.predefinito;
+
+/* ---------- testi ---------- */
+const meseU = meseLungo(U), meseP = meseLungo(U - 12);
+document.getElementById("sommario").textContent =
+  `Diffusione media giornaliera dei quotidiani a ${meseU} e variazione rispetto a ${meseP}. Scegli un giornale per evidenziarlo e vedere come è andato dal 2021.`;
+document.getElementById("lead-ip").textContent =
+  `Copie cartacee, abbonamenti cartacei e copie digitali vendute ad almeno il 30% del prezzo, media giornaliera di ${meseU}.`;
+document.getElementById("lead-d30").textContent =
+  `Media giornaliera di ${meseU}, esclusi gli abbonamenti digitali venduti a meno del 30% del prezzo. Nell’ultima colonna, come sono cambiati gli abbonamenti superscontati (venduti tra il 10% e il 30% del prezzo).`;
+document.getElementById("agg").textContent = D.aggiornato;
+
+/* ---------- selettore ---------- */
+const selEl = document.getElementById("sel");
+D.testate.map((t, i) => [t.n, i]).sort((a, b) => a[0].localeCompare(b[0], "it"))
+  .forEach(([n, i]) => selEl.add(new Option(n, i)));
+selEl.value = sel;
+selEl.addEventListener("change", () => scegli(+selEl.value));
+
+function scegli(i){
+  sel = i; selEl.value = i;
+  document.querySelectorAll(".riga").forEach(r => r.classList.toggle("sel", +r.dataset.i === i));
+  document.querySelectorAll(".evid-box").forEach(b => b.classList.add("evid"));
+  tempo();
+}
+
+/* ---------- barre ---------- */
+function barre(id, chiave, extra){
+  const righe = D.testate.map((t, i) => ({i, n: t.n, v: t[chiave][U], d: var12(t[chiave], U),
+      ex: extra ? t[extra] : null}))
+    .filter(r => r.v > 0).sort((a, b) => b.v - a.v);
+  const max = righe[0].v;
+  const box = document.getElementById(id);
+  box.classList.add("evid-box");   // le altre barre si attenuano solo dopo che si sceglie un giornale
+  let h = `<div class="intest"><span>Giornale</span><span>Copie al giorno</span><span>vs ${MESI[(+D.mesi[U].slice(5))-1]} ${+D.mesi[U].slice(0,4)-1}</span>${extra ? "<span>super-<br>scontati</span>" : ""}</div>`;
+  for (const r of righe){
+    let exCell = "";
+    if (extra){
+      const s = r.ex, ora = s[U], prima = s[U-12];
+      exCell = !prima ? `<span class="v ex nd">${ora ? "nuovi" : "nessuno"}</span>`
+                      : `<span class="v ex ${cls(var12(s, U))}">${pct(var12(s, U))}</span>`;
+    }
+    h += `<div class="riga${r.i === sel ? " sel" : ""}" data-i="${r.i}" role="button" tabindex="0" aria-label="${r.n}: ${num(r.v)} copie">
+      <span class="n"><em>${r.n}</em></span>
+      <span class="b"><i style="--p:${(r.v / max).toFixed(4)}"></i><span>${num(r.v)}</span></span>
+      <span class="v ${cls(r.d)}">${r.d == null ? "n.d." : pct(r.d)}</span>${exCell}</div>`;
+  }
+  box.innerHTML = h;
+  box.addEventListener("click", e => { const r = e.target.closest(".riga"); if (r) scegli(+r.dataset.i); });
+  box.addEventListener("keydown", e => { const r = e.target.closest(".riga"); if (r && (e.key === "Enter" || e.key === " ")) { e.preventDefault(); scegli(+r.dataset.i); } });
+
+  // totale delle testate presenti in entrambi gli anni
+  let a = 0, b = 0;
+  for (const t of D.testate){ const x = t[chiave][U], y = t[chiave][U-12]; if (x > 0 && y > 0){ a += x; b += y; } }
+  document.getElementById(id.replace("barre", "tot")).innerHTML =
+    `Tutti i giornali dell’elenco insieme: <b>${num(a)}</b> copie al giorno, <span class="${cls(a/b-1)}" style="font-family:var(--mono)">${pct((a/b-1)*100)}</span> rispetto a ${meseP} (somma delle testate presenti in entrambi i mesi).`;
+}
+barre("barre-ip", "ip");
+barre("barre-d30", "d30", "ss");
+
+/* ---------- andamento nel tempo ---------- */
+const date = D.mesi.map(s => { const [y, m] = s.split("-").map(Number); return new Date(y, m - 1, 1); });
+
+function numeri(t){
+  const blocco = (v, d, etich, colore) => `<div class="numero"><div class="v">${v == null ? "–" : num(v)}</div>
+    <div class="l"><i style="background:${colore}"></i>${etich}, ${meseCorto(U)}</div>
+    <div class="d ${cls(d)}">${d == null ? "" : pct(d) + " in un anno"}</div></div>`;
+  document.getElementById("numeri").innerHTML =
+    blocco(t.ip[U], var12(t.ip, U), "individuale pagata", "var(--azzurro)") +
+    blocco(t.d30[U], var12(t.d30, U), "digitali ≥30% del prezzo", "var(--azzurro)") +
+    (t.ss[U] ? blocco(t.ss[U], var12(t.ss, U), "digitali superscontati", "var(--cat5)") : "");
+}
+
+function linee(id, serie){
+  // serie: [{k, valori, classe, etichetta, colore}]
+  const box = document.getElementById(id);
+  box.innerHTML = "";
+  const W = box.clientWidth, H = box.clientHeight;
+  const mob = W < 480;
+  const m = {t: 10, r: mob ? 12 : 18, b: 26, l: mob ? 50 : 58};
+  const tutti = serie.flatMap(s => s.valori.filter(v => v != null));
+  if (!tutti.length){ box.innerHTML = '<p class="ilpost-note">Nessun dato.</p>'; return; }
+  const x = d3.scaleTime().domain([date[0], date[U]]).range([m.l, W - m.r]);
+  const y = d3.scaleLinear().domain([0, d3.max(tutti) * 1.08]).nice(mob ? 4 : 5).range([H - m.b, m.t]);
+  const svg = d3.select(box).append("svg").attr("width", W).attr("height", H).attr("viewBox", `0 0 ${W} ${H}`)
+    .attr("role", "img").attr("aria-label", serie.map(s => s.etichetta).join(" e "));
+  svg.append("g").attr("class", "grid").selectAll("line").data(y.ticks(mob ? 4 : 5).filter(v => v > 0)).join("line")
+    .attr("x1", m.l).attr("x2", W - m.r).attr("y1", y).attr("y2", y);
+  svg.append("g").attr("class", "ax").attr("transform", `translate(${m.l},0)`)
+    .call(d3.axisLeft(y).ticks(mob ? 4 : 5).tickSize(0).tickPadding(8).tickFormat(v => nf.format(v)))
+    .select(".domain").remove();
+  const anni = d3.timeYear.range(date[0], d3.timeMonth.offset(date[U], 1));
+  svg.append("g").attr("class", "ax").attr("transform", `translate(0,${H - m.b})`)
+    .call(d3.axisBottom(x).tickValues(anni).tickSize(4).tickPadding(6).tickFormat(d => d.getFullYear()));
+
+  for (const s of serie){
+    const gen = d3.line().defined(v => v != null).x((v, i) => x(date[i])).y(v => y(v));
+    svg.append("path").attr("class", "alone").attr("d", gen(s.valori));
+    svg.append("path").attr("class", s.classe).attr("d", gen(s.valori));
+    const ui = s.valori.length - 1 - [...s.valori].reverse().findIndex(v => v != null);
+    if (ui < s.valori.length && s.valori[ui] != null){
+      svg.append("circle").attr("class", "ultimo").attr("cx", x(date[ui])).attr("cy", y(s.valori[ui])).attr("r", 5)
+        .style("stroke", s.colore);
+    }
+  }
+  // etichette dirette solo se ci sono due linee
+  if (serie.length > 1){
+    // la linea più alta ha l'etichetta sopra, quella più bassa sotto: così non si sovrappongono
+    const ord = serie.filter(s => s.valori[U] != null).sort((a, b) => b.valori[U] - a.valori[U]);
+    ord.forEach((s, k) => {
+      const yy = y(s.valori[U]);
+      const sotto = k > 0 && Math.abs(y(ord[k-1].valori[U]) - yy) < 34;
+      svg.append("text").attr("class", "etich").attr("x", W - m.r - 10)
+        .attr("y", Math.min(H - m.b - 4, sotto ? yy + 20 : yy - 11)).attr("text-anchor", "end")
+        .style("fill", s.colore).text(s.etichetta);
+    });
+  }
+
+  // interazione: mouse e dito
+  const tip = document.createElement("div"); tip.className = "tip"; box.appendChild(tip);
+  const guida = svg.append("line").attr("class", "guida").attr("y1", m.t).attr("y2", H - m.b).attr("opacity", 0);
+  const punti = svg.append("g");
+  const nascondi = () => { tip.style.opacity = 0; guida.attr("opacity", 0); punti.selectAll("*").remove(); };
+  const mostra = ev => {
+    const [px] = d3.pointer(ev, svg.node());
+    const i = Math.max(0, Math.min(U, Math.round(d3.timeMonth.count(date[0], x.invert(px)))));
+    const xi = x(date[i]);
+    guida.attr("x1", xi).attr("x2", xi).attr("opacity", 1);
+    punti.selectAll("*").remove();
+    let h = `<b>${meseLungo(i)}</b>`;
+    for (const s of serie){
+      const v = s.valori[i]; if (v == null) continue;
+      punti.append("circle").attr("cx", xi).attr("cy", y(v)).attr("r", 4).style("fill", s.colore);
+      const d = var12(s.valori, i);
+      h += `<div><span class="mono">${num(v)}</span> <span class="m">${s.etichetta}</span>${d == null ? "" : ` <span class="mono ${cls(d)}">${pct(d)}</span>`}</div>`;
+    }
+    tip.innerHTML = h + `<div class="m">variazione su un anno prima</div>`;
+    tip.style.borderLeftColor = serie[0].colore;
+    tip.style.opacity = 1;
+    const tw = tip.offsetWidth;
+    let lx = xi + 14; if (lx + tw > W) lx = xi - tw - 14; if (lx < 0) lx = 0;
+    tip.style.left = lx + "px"; tip.style.top = m.t + "px";
+  };
+  svg.append("rect").attr("x", m.l).attr("y", m.t).attr("width", W - m.l - m.r).attr("height", H - m.t - m.b)
+    .attr("fill", "transparent").style("touch-action", "pan-y")
+    .on("pointermove", mostra).on("pointerdown", mostra).on("pointerleave", nascondi);
+}
+
+function tempo(){
+  const t = D.testate[sel];
+  document.getElementById("tit-tempo").textContent = `Com’è andato ${t.n} dal 2021`;
+  numeri(t);
+  const AZ = "var(--azzurro)", GR = "var(--cat5)";
+  linee("linee-ip", [{valori: t.ip, classe: "l-princ", etichetta: "individuale pagata", colore: AZ}]);
+  const s = [{valori: t.d30, classe: "l-princ", etichetta: "≥30% del prezzo", colore: AZ}];
+  if (t.ss.some(v => v)) s.push({valori: t.ss, classe: "l-sec", etichetta: "superscontati (10-30%)", colore: GR});
+  linee("linee-d30", s);
+}
+tempo();
+let rt; new ResizeObserver(() => { clearTimeout(rt); rt = setTimeout(tempo, 80); }).observe(document.getElementById("sez-tempo"));
+</script>
+</body>
+</html>

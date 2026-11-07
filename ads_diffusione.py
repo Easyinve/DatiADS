@@ -1,14 +1,15 @@
 #!/usr/bin/env python3
 """
-Scarica i dati mensili ADS (DMS) dei quotidiani da adsnotizie.it e produce due grafici:
+Scarica i dati mensili ADS (DMS) dei quotidiani da adsnotizie.it e produce una pagina HTML
+nello stile dei grafici del Post, con:
 
 1. Diffusione media giornaliera "individuale pagata": cartacee + abbonamenti cartacei + copie digitali
    vendute ad almeno il 30% del prezzo (colonne 2+3+4a; esclusa la 4b, digitali tra il 10 e il 30%)
-2. Sole copie digitali individuali vendute ad almeno il 30% del prezzo ufficiale (colonna 4a)
+2. Sole copie digitali individuali vendute ad almeno il 30% del prezzo ufficiale (colonna 4a),
+   con la variazione degli abbonamenti superscontati (colonna 4b)
+3. L'andamento nel tempo di queste serie, da gennaio 2021, per il giornale scelto
 
 Sono esclusi i quotidiani sportivi (Gazzetta dello Sport, Corriere dello Sport, Tuttosport).
-
-Per ogni testata mostra il dato del mese e la variazione % rispetto allo stesso mese dell'anno prima.
 
 Uso:
     python3 ads_diffusione.py                 # ultimo mese disponibile sul sito
@@ -17,14 +18,13 @@ Uso:
 """
 
 import argparse
+import json
 import re
 import sys
+import time
+from datetime import date
 from pathlib import Path
 
-import matplotlib
-
-matplotlib.use("Agg")
-import matplotlib.pyplot as plt
 import pandas as pd
 import requests
 
@@ -34,9 +34,14 @@ DOWNLOAD_URL = f"{BASE}/Dati/downloadDMS"
 PERIODICITA_QUOTIDIANI = 1
 HEADERS = {"User-Agent": "Mozilla/5.0 (ads_diffusione.py)"}
 
+# Prima del 2021 il file ADS non ha il totale delle vendite individuali e le categorie
+# potrebbero non essere confrontabili: le serie partono da qui.
+INIZIO = (2021, 1)
+
 ROOT = Path(__file__).resolve().parent
 DATA_DIR = ROOT / "dati"
 OUT_DIR = ROOT / "grafici"
+STILE = ROOT / "stile"
 
 MESI = ["", "gennaio", "febbraio", "marzo", "aprile", "maggio", "giugno", "luglio",
         "agosto", "settembre", "ottobre", "novembre", "dicembre"]
@@ -51,32 +56,60 @@ COL_DIGITALI_30 = 12     # 4a – Vendite copie digitali individuali >= 30% del 
 COL_DIGITALI_10_30 = 13  # 4b – Vendite copie digitali individuali tra il 10 e il 30% ("superscontate")
 HEADER_ROWS = 4
 
-# Quotidiani sportivi (e loro edizioni del lunedì) esclusi dai grafici
-ESCLUDI = re.compile(r"GAZZETTA SPORT|CORRIERE SPORT|TUTTOSPORT", re.IGNORECASE)
-
-METRICHE = {
-    "individuale_pagata": {
-        # 2 + 3 + 4a: escluse le copie digitali vendute tra il 10% e il 30% del prezzo (4b)
-        "cols": [COL_CARTACEE, COL_ABB_CARTACEI, COL_DIGITALI_30],
-        "titolo": "Diffusione media giornaliera individuale pagata",
-        "sottotitolo": "Cartacee + abbonamenti cartacei + digitali vendute ad almeno il 30% del prezzo "
-                       "(col. 2+3+4a ADS)",
-        "colore": "#1f6fb4",
-    },
-    "digitale_30": {
-        "cols": [COL_DIGITALI_30],
-        "titolo": "Copie digitali individuali vendute ad almeno il 30% del prezzo",
-        "sottotitolo": "Esclusi gli abbonamenti digitali venduti a meno del 30% del prezzo ufficiale (col. 4a ADS)",
-        "colore": "#e07b39",
-        # colonna aggiuntiva con la variazione degli abbonamenti superscontati
-        "extra": ("superscontati", "superscontati\n(10-30%)"),
-    },
+SERIE = {
+    "ip": [COL_CARTACEE, COL_ABB_CARTACEI, COL_DIGITALI_30],  # individuale pagata
+    "d30": [COL_DIGITALI_30],                                 # digitali >= 30%
+    "ss": [COL_DIGITALI_10_30],                               # superscontati
 }
 
-# Serie calcolate solo per confronto (non hanno un grafico proprio)
-SERIE_EXTRA = {"superscontati": [COL_DIGITALI_10_30]}
-SERIE = {**{k: v["cols"] for k, v in METRICHE.items()}, **SERIE_EXTRA}
+# Quotidiani sportivi (e loro edizioni del lunedì) esclusi
+ESCLUDI = re.compile(r"GAZZETTA SPORT|CORRIERE SPORT|TUTTOSPORT", re.IGNORECASE)
 
+# Giornale mostrato all'apertura della pagina
+PREDEFINITO = "CORRIERE DELLA SERA"
+
+# Nomi da mostrare quando la regola generale (vedi nome_leggibile) non basta
+NOMI = {
+    "QN-Il Resto del Carlino": "Il Resto del Carlino",
+    "QN-La Nazione": "La Nazione",
+    "QN-Il Giorno": "Il Giorno",
+    "CORRIERE Umbria/AR/SI": "Corriere dell’Umbria",
+    "NUOVA DI VENEZIA E ME. (LA)": "La Nuova di Venezia e Mestre",
+    "GAZZETTA DEL MEZZOGIORNO(LA)": "La Gazzetta del Mezzogiorno",
+    "VERITA'(LA)": "La Verità",
+    "LIBERTA'": "Libertà",
+    "ALTOADIGE": "Alto Adige",
+    "ITALIA OGGI": "ItaliaOggi",
+    "SOLE 24 ORE (IL)": "Il Sole 24 Ore",
+    "PROVINCIA (COMO) (LA)": "La Provincia di Como",
+    "MANIFESTO (IL)": "il manifesto",
+    "EDICOLA (L')": "L’Edicola del Sud",
+    "SECOLO XIX (IL)": "Il Secolo XIX",
+}
+MINUSCOLE = {"di", "del", "della", "delle", "dei", "degli", "e", "ed", "da", "in"}
+
+
+def nome_leggibile(raw: str) -> str:
+    """'ECO DI BERGAMO (L')' -> 'L’Eco di Bergamo'."""
+    raw = raw.strip()
+    if raw in NOMI:
+        return NOMI[raw]
+    articolo = ""
+    m = re.match(r"^(.*?)\s*\((IL|LA|L'|LO|I|LE|GLI)\)\s*$", raw, re.IGNORECASE)
+    if m:
+        raw, articolo = m.group(1), m.group(2)
+    parole = []
+    for i, p in enumerate(raw.split()):
+        pl = p.lower()
+        parole.append(pl if (i > 0 and pl in MINUSCOLE) else pl[:1].upper() + pl[1:])
+    nome = " ".join(parole).replace("'", "’")
+    if articolo:
+        art = articolo.capitalize().replace("'", "’")
+        nome = art + nome if art.endswith("’") else f"{art} {nome}"
+    return nome
+
+
+# ---------------------------------------------------------------- download
 
 def ultimo_mese_disponibile() -> tuple[int, int]:
     """Legge la pagina DMS e restituisce (mese, anno) più recente per i quotidiani."""
@@ -106,7 +139,17 @@ def scarica(mese: int, anno: int, force: bool = False) -> Path:
     if not r.content.startswith(b"PK"):
         raise RuntimeError(f"Il download di {mese}/{anno} non è un file Excel valido.")
     dest.write_bytes(r.content)
+    time.sleep(0.3)  # gentilezza verso il sito ADS
     return dest
+
+
+def mesi_tra(inizio: tuple[int, int], fine: tuple[int, int]) -> list[tuple[int, int]]:
+    """Lista di (anno, mese) da inizio a fine compresi."""
+    out, (a, m) = [], inizio
+    while (a, m) <= fine:
+        out.append((a, m))
+        a, m = (a + 1, 1) if m == 12 else (a, m + 1)
+    return out
 
 
 def leggi(path: Path, mese: int, anno: int) -> pd.DataFrame:
@@ -117,6 +160,8 @@ def leggi(path: Path, mese: int, anno: int) -> pd.DataFrame:
     df = df[~df[COL_TESTATA].astype(str).str.contains(ESCLUDI)]
     out = pd.DataFrame({
         "testata": df[COL_TESTATA].astype(str).str.strip(),
+        "anno": anno,
+        "mese": mese,
         **{k: df[cols].apply(pd.to_numeric, errors="coerce").sum(axis=1, min_count=1)
            for k, cols in SERIE.items()},
     })
@@ -125,93 +170,54 @@ def leggi(path: Path, mese: int, anno: int) -> pd.DataFrame:
     return out
 
 
-def confronta(mese: int, anno: int, force: bool) -> pd.DataFrame:
-    cur = leggi(scarica(mese, anno, force), mese, anno)
-    prev = leggi(scarica(mese, anno - 1, force), mese, anno - 1)
-    df = cur.merge(prev, on="testata", how="left", suffixes=("", "_prec"))
-    for k in SERIE:
-        prec = df[f"{k}_prec"].where(df[f"{k}_prec"] > 0)
-        df[f"{k}_var"] = (df[k] / prec - 1) * 100
-    return df
+def storico(fino_a: tuple[int, int], force_ultimo: bool) -> pd.DataFrame:
+    """Scarica (se mancano) e legge tutti i mesi da INIZIO a fino_a."""
+    mesi = mesi_tra(INIZIO, fino_a)
+    parti = []
+    for a, m in mesi:
+        ultimi = (a, m) == fino_a or (a + 1, m) == fino_a
+        parti.append(leggi(scarica(m, a, force_ultimo and ultimi), m, a))
+    return pd.concat(parti, ignore_index=True)
 
 
-def fmt_int(x: float) -> str:
-    return f"{int(round(x)):,}".replace(",", ".")
+# ---------------------------------------------------------------- pagina
+
+def dati_pagina(df: pd.DataFrame, fino_a: tuple[int, int]) -> dict:
+    mesi = mesi_tra(INIZIO, fino_a)
+    chiavi = [f"{a}-{m:02d}" for a, m in mesi]
+    df = df.assign(chiave=df["anno"].astype(str) + "-" + df["mese"].map("{:02d}".format))
+    # solo i giornali presenti nell'ultimo mese
+    attuali = df.loc[df["chiave"] == chiavi[-1], "testata"].unique()
+    testate = []
+    for raw in sorted(attuali):
+        d = df[df["testata"] == raw].set_index("chiave")
+        voce = {"raw": raw, "n": nome_leggibile(raw)}
+        for k in SERIE:
+            s = d[k].reindex(chiavi)
+            voce[k] = [None if pd.isna(v) else int(v) for v in s]
+        testate.append(voce)
+    pred = next((i for i, t in enumerate(testate) if t["raw"] == PREDEFINITO), 0)
+    oggi = date.today()
+    return {"mesi": chiavi, "testate": testate, "predefinito": pred,
+            "aggiornato": f"{oggi.day} {MESI[oggi.month]} {oggi.year}"}
 
 
-def grafico(df: pd.DataFrame, chiave: str, mese: int, anno: int) -> Path:
-    cfg = METRICHE[chiave]
-    d = df[df[chiave] > 0].sort_values(chiave)
-    n = len(d)
-    fig, ax = plt.subplots(figsize=(11, 0.28 * n + 2.2))
-    y = range(n)
-    ax.barh(y, d[chiave], color=cfg["colore"], height=0.7)
-    ax.set_yticks(list(y), d["testata"], fontsize=8.5)
-    ax.set_ylim(-0.6, n - 0.4)
-    xmax = d[chiave].max()
-    extra = cfg.get("extra")
-    x_var = xmax * 1.31
-    x_extra = xmax * 1.50
-    ax.set_xlim(0, (x_extra if extra else x_var) + xmax * 0.01)
-
-    def scrivi_var(x, yi, var, bold=True):
-        if pd.isna(var):
-            txt, col = "n.d.", "#888888"
-        else:
-            txt = f"{var:+.1f}%".replace(".", ",")
-            col = "#1a8f3c" if var >= 0 else "#c62828"
-        ax.text(x, yi, txt, va="center", ha="right", fontsize=8, color=col,
-                fontweight="bold" if bold else "normal")
-
-    for yi, (_, r) in enumerate(d.iterrows()):
-        ax.text(r[chiave] + xmax * 0.01, yi, fmt_int(r[chiave]), va="center", fontsize=8)
-        scrivi_var(x_var, yi, r[f"{chiave}_var"])
-        if extra:
-            k = extra[0]
-            if not r[f"{k}_prec"]:
-                ax.text(x_extra, yi, "nuovo" if r[k] else "nessuno", va="center", ha="right",
-                        fontsize=7.5, color="#888888", style="italic")
-            else:
-                scrivi_var(x_extra, yi, r[f"{k}_var"], bold=False)
-
-    ax.text(x_var, n - 0.2, f"vs {MESI[mese][:3]} {anno - 1}", ha="right",
-            va="bottom", fontsize=8, color="#555555")
-    if extra:
-        ax.text(x_extra, n - 0.2, f"{extra[1]}\nvs {MESI[mese][:3]} {anno - 1}", ha="right",
-                va="bottom", fontsize=7.5, color="#555555", linespacing=1.1)
-
-    tot, tot_prec = d[chiave].sum(), df.loc[d.index, f"{chiave}_prec"].sum()
-    var_tot = (tot / tot_prec - 1) * 100 if tot_prec else float("nan")
-    fig.suptitle(f"{cfg['titolo']} – {MESI[mese]} {anno}", x=0.02, ha="left",
-                 fontsize=13, fontweight="bold")
-    var_txt = f"{var_tot:+.1f}".replace(".", ",")
-    ax.set_title(f"{cfg['sottotitolo']}\nTotale testate: {fmt_int(tot)} copie "
-                 f"({var_txt}% rispetto a {MESI[mese]} {anno - 1})",
-                 loc="left", fontsize=9, color="#444444")
-    ax.spines[["top", "right"]].set_visible(False)
-    ax.xaxis.set_major_formatter(matplotlib.ticker.FuncFormatter(lambda v, _: fmt_int(v)))
-    ax.tick_params(axis="x", labelsize=8)
-    # l'asse si ferma sotto le barre, non sotto le colonne delle variazioni
-    ax.set_xticks([t for t in ax.get_xticks() if 0 <= t <= xmax * 1.08])
-    ax.spines["bottom"].set_bounds(0, xmax * 1.08)
-    ax.grid(axis="x", alpha=0.3)
-    ax.set_axisbelow(True)
-    fig.text(0.02, 0.005, "Fonte: ADS – Accertamenti Diffusione Stampa, dati DMS. "
-             "Media giornaliera per numero uscito.", fontsize=7, color="#777777")
-    fig.tight_layout(rect=(0, 0.01, 1, 0.98))
-
-    OUT_DIR.mkdir(exist_ok=True)
-    out = OUT_DIR / f"{anno}_{mese:02d}_{chiave}.png"
-    fig.savefig(out, dpi=150)
-    plt.close(fig)
-    return out
+def scrivi_pagina(dati: dict, dest: Path) -> None:
+    modello = (STILE / "pagina.html").read_text(encoding="utf-8")
+    pagina = (modello
+              .replace("/*__CSS__*/", (STILE / "theme.css").read_text(encoding="utf-8"))
+              .replace("__LOGO_CHIARO__", (STILE / "logo-ilpost.datauri.txt").read_text().strip())
+              .replace("__LOGO_SCURO__", (STILE / "logo-ilpost-scuro.datauri.txt").read_text().strip())
+              .replace("/*__DATA__*/null", json.dumps(dati, ensure_ascii=False, separators=(",", ":"))))
+    dest.write_text(pagina, encoding="utf-8")
 
 
 def main() -> None:
     p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     p.add_argument("--mese", type=int)
     p.add_argument("--anno", type=int)
-    p.add_argument("--force", action="store_true", help="riscarica i dati e rigenera i grafici")
+    p.add_argument("--force", action="store_true",
+                   help="riscarica l'ultimo mese (e lo stesso mese dell'anno prima) e rigenera la pagina")
     a = p.parse_args()
 
     if a.mese and a.anno:
@@ -219,19 +225,25 @@ def main() -> None:
     else:
         mese, anno = ultimo_mese_disponibile()
 
-    gia_fatti = [OUT_DIR / f"{anno}_{mese:02d}_{k}.png" for k in METRICHE]
-    if all(f.exists() for f in gia_fatti) and not a.force:
-        print(f"{MESI[mese]} {anno}: grafici già presenti, niente da fare.")
+    OUT_DIR.mkdir(exist_ok=True)
+    pagina_mese = OUT_DIR / f"{anno}_{mese:02d}.html"
+    if pagina_mese.exists() and not a.force:
+        print(f"{MESI[mese]} {anno}: pagina già presente, niente da fare.")
         return
 
-    print(f"Elaboro {MESI[mese]} {anno} (confronto con {MESI[mese]} {anno - 1})…")
-    df = confronta(mese, anno, a.force)
-    csv = OUT_DIR / f"{anno}_{mese:02d}_dati.csv"
-    OUT_DIR.mkdir(exist_ok=True)
-    df.to_csv(csv, index=False, sep=";", decimal=",")
-    for k in METRICHE:
-        print("  →", grafico(df, k, mese, anno))
-    print("  →", csv)
+    print(f"Elaboro {MESI[mese]} {anno} (storico da {MESI[INIZIO[1]]} {INIZIO[0]})…")
+    df = storico((anno, mese), a.force)
+
+    df.sort_values(["testata", "anno", "mese"]).to_csv(
+        OUT_DIR / "dati_storici.csv", index=False, sep=";", decimal=",")
+    dati = dati_pagina(df, (anno, mese))
+    scrivi_pagina(dati, pagina_mese)
+    # index.html è sempre l'ultimo mese disponibile
+    ultimo = max(OUT_DIR.glob("[0-9][0-9][0-9][0-9]_[0-9][0-9].html"))
+    if ultimo == pagina_mese:
+        scrivi_pagina(dati, OUT_DIR / "index.html")
+    for f in (pagina_mese, OUT_DIR / "index.html", OUT_DIR / "dati_storici.csv"):
+        print("  →", f)
 
 
 if __name__ == "__main__":
