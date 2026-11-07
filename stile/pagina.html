@@ -24,9 +24,18 @@ body{font-family:var(--sans)}
 
 /* selettore, sempre a portata di dito */
 .scegli{position:sticky;top:0;z-index:5;background:var(--bg);padding:10px 0 8px;margin:4px 0 0;
-  display:flex;gap:10px;align-items:center;flex-wrap:wrap;border-bottom:1px solid var(--hair)}
+  border-bottom:1px solid var(--hair)}
+.scegli .riga-cerca{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
 .scegli label{font-size:14px;color:var(--testo)}
-.scegli select{flex:1;min-width:0;max-width:340px}
+.scegli input{flex:1;min-width:0;max-width:340px}
+.chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+.chips:empty{display:none}
+.chip{display:inline-flex;align-items:center;gap:6px;min-height:34px !important;padding:0 6px 0 10px !important;
+  border-radius:17px !important;font-size:13px !important;cursor:pointer;border:1px solid var(--hair);background:var(--bg)}
+.chip i{display:inline-block;width:10px;height:10px;border-radius:50%}
+.chip b{font-weight:400;color:var(--muted);font-size:16px;line-height:1;padding:0 4px}
+.chip.azzera{color:var(--muted);padding:0 10px !important}
+.avviso{font-size:12px;color:var(--muted);margin:6px 0 0}
 
 /* barre orizzontali in HTML: si adattano alla larghezza e al tema da sole */
 .intest,.riga{display:grid;grid-template-columns:minmax(0,10.5em) minmax(0,1fr) 4.4em;align-items:center;column-gap:8px}
@@ -45,7 +54,7 @@ body{font-family:var(--sans)}
 .riga .v.ex{font-weight:300}
 .pos{color:var(--pos)} .neg{color:var(--neg)} .nd{color:var(--muted);font-style:italic;font-family:var(--sans)}
 .evid .riga .b i{opacity:.28}
-.evid .riga.sel .b i{opacity:1}
+.evid .riga.sel .b i{opacity:1;background:var(--col,var(--azzurro))}
 .riga.sel .n{font-weight:700}
 .riga.sel .n em{font-style:normal;background:var(--giallo);color:var(--su-giallo);padding:0 3px}
 .riga:hover .n{text-decoration:underline;text-decoration-color:var(--asse)}
@@ -101,8 +110,13 @@ body{font-family:var(--sans)}
   <p class="ilpost-lead" id="sommario"></p>
 
   <div class="scegli">
-    <label for="sel">Evidenzia un giornale</label>
-    <select id="sel"></select>
+    <div class="riga-cerca">
+      <label for="cerca">Evidenzia uno o più giornali</label>
+      <input id="cerca" type="search" list="elenco" placeholder="Scrivi il nome…" autocomplete="off">
+      <datalist id="elenco"></datalist>
+    </div>
+    <div class="chips" id="chips"></div>
+    <p class="avviso" id="avviso" hidden></p>
   </div>
 
   <section class="sezione" id="sez-ip">
@@ -121,12 +135,14 @@ body{font-family:var(--sans)}
 
   <section class="sezione" id="sez-tempo">
     <h3 id="tit-tempo"></h3>
-    <p class="ilpost-lead">Media giornaliera mese per mese, da gennaio 2021. Tocca o passa sopra le linee per leggere i valori.</p>
+    <p class="ilpost-lead" id="lead-tempo"></p>
     <div class="numeri" id="numeri"></div>
     <p class="tit-linee">Diffusione individuale pagata</p>
     <div class="linee" id="linee-ip"></div>
-    <p class="tit-linee">Copie digitali</p>
+    <p class="tit-linee">Copie digitali vendute ad almeno il 30% del prezzo</p>
     <div class="linee" id="linee-d30"></div>
+    <p class="tit-linee">Abbonamenti digitali superscontati (10-30% del prezzo)</p>
+    <div class="linee" id="linee-ss"></div>
   </section>
 
   <p class="ilpost-note">Diffusione individuale pagata: copie cartacee vendute in edicola, abbonamenti cartacei e copie digitali vendute ad almeno il 30% del prezzo ufficiale (colonne 2, 3 e 4a dei dati ADS). Abbonamenti superscontati: copie digitali vendute tra il 10% e il 30% del prezzo (colonna 4b). Sono esclusi i quotidiani sportivi.</p>
@@ -149,31 +165,65 @@ const U = D.mesi.length - 1;                 // ultimo mese
 const var12 = (s, i) => (i >= 12 && s[i] != null && s[i-12]) ? (s[i] / s[i-12] - 1) * 100 : null;
 const cls = v => v == null ? "nd" : v >= 0 ? "pos" : "neg";
 
-let sel = D.predefinito;
+// giornali evidenziati, nell'ordine in cui sono stati scelti (all'inizio nessuno)
+let sel = [];
+const MAX_SEL = 6;
+const COLORI = ["var(--cat1)", "var(--cat2)", "var(--cat3)", "var(--cat4)", "var(--cat5)", "var(--cat6)"];
+const colore = i => COLORI[sel.indexOf(i)];
 
 /* ---------- testi ---------- */
 const meseU = meseLungo(U), meseP = meseLungo(U - 12);
 document.getElementById("sommario").textContent =
-  `Diffusione media giornaliera dei quotidiani a ${meseU} e variazione rispetto a ${meseP}. Scegli un giornale per evidenziarlo e vedere come è andato dal 2021.`;
+  `Diffusione media giornaliera dei quotidiani a ${meseU} e variazione rispetto a ${meseP}. Puoi evidenziare uno o più giornali, cercandoli per nome o toccandone la barra, e vedere com’è andata dal 2021.`;
 document.getElementById("lead-ip").textContent =
   `Copie cartacee, abbonamenti cartacei e copie digitali vendute ad almeno il 30% del prezzo, media giornaliera di ${meseU}.`;
 document.getElementById("lead-d30").textContent =
   `Media giornaliera di ${meseU}, esclusi gli abbonamenti digitali venduti a meno del 30% del prezzo. Nell’ultima colonna, come sono cambiati gli abbonamenti superscontati (venduti tra il 10% e il 30% del prezzo).`;
 document.getElementById("agg").textContent = D.aggiornato;
 
-/* ---------- selettore ---------- */
-const selEl = document.getElementById("sel");
-D.testate.map((t, i) => [t.n, i]).sort((a, b) => a[0].localeCompare(b[0], "it"))
-  .forEach(([n, i]) => selEl.add(new Option(n, i)));
-selEl.value = sel;
-selEl.addEventListener("change", () => scegli(+selEl.value));
+/* ---------- selettore: ricerca + etichette ---------- */
+const cerca = document.getElementById("cerca");
+const perNome = new Map(D.testate.map((t, i) => [t.n.toLowerCase(), i]));
+document.getElementById("elenco").innerHTML = D.testate.map(t => t.n).sort((a, b) => a.localeCompare(b, "it"))
+  .map(n => `<option value="${n}"></option>`).join("");
+function daRicerca(){
+  const i = perNome.get(cerca.value.trim().toLowerCase());
+  if (i == null) return;
+  cerca.value = "";
+  if (!sel.includes(i)) alterna(i);
+}
+cerca.addEventListener("input", daRicerca);   // scelta dai suggerimenti
+cerca.addEventListener("change", daRicerca);
+cerca.addEventListener("keydown", e => { if (e.key === "Enter") daRicerca(); });
 
-function scegli(i){
-  sel = i; selEl.value = i;
-  document.querySelectorAll(".riga").forEach(r => r.classList.toggle("sel", +r.dataset.i === i));
-  document.querySelectorAll(".evid-box").forEach(b => b.classList.add("evid"));
+function alterna(i){
+  const avviso = document.getElementById("avviso");
+  avviso.hidden = true;
+  if (sel.includes(i)) sel = sel.filter(x => x !== i);
+  else if (sel.length >= MAX_SEL){ avviso.textContent = `Si possono evidenziare al massimo ${MAX_SEL} giornali alla volta: togline uno per aggiungerne un altro.`; avviso.hidden = false; return; }
+  else sel = [...sel, i];
+  aggiorna();
+}
+function azzera(){ sel = []; document.getElementById("avviso").hidden = true; aggiorna(); }
+
+function aggiorna(){
+  const chips = document.getElementById("chips");
+  chips.innerHTML = sel.map(i => `<button type="button" class="chip" data-i="${i}" aria-label="Togli ${D.testate[i].n}">
+      <i style="background:${colore(i)}"></i>${D.testate[i].n}<b aria-hidden="true">×</b></button>`).join("")
+    + (sel.length > 1 ? `<button type="button" class="chip azzera" data-azzera="1">Togli tutti</button>` : "");
+  document.querySelectorAll(".riga").forEach(r => {
+    const i = +r.dataset.i, on = sel.includes(i);
+    r.classList.toggle("sel", on);
+    r.setAttribute("aria-pressed", on);
+    if (on) r.style.setProperty("--col", colore(i)); else r.style.removeProperty("--col");
+  });
+  document.querySelectorAll(".evid-box").forEach(b => b.classList.toggle("evid", sel.length > 0));
   tempo();
 }
+document.getElementById("chips").addEventListener("click", e => {
+  const c = e.target.closest(".chip"); if (!c) return;
+  if (c.dataset.azzera) azzera(); else alterna(+c.dataset.i);
+});
 
 /* ---------- barre ---------- */
 function barre(id, chiave, extra){
@@ -182,7 +232,7 @@ function barre(id, chiave, extra){
     .filter(r => r.v > 0).sort((a, b) => b.v - a.v);
   const max = righe[0].v;
   const box = document.getElementById(id);
-  box.classList.add("evid-box");   // le altre barre si attenuano solo dopo che si sceglie un giornale
+  box.classList.add("evid-box");   // le altre barre si attenuano solo quando c'è almeno un giornale scelto
   let h = `<div class="intest"><span>Giornale</span><span>Copie al giorno</span><span>vs ${MESI[(+D.mesi[U].slice(5))-1]} ${+D.mesi[U].slice(0,4)-1}</span>${extra ? "<span>super-<br>scontati</span>" : ""}</div>`;
   for (const r of righe){
     let exCell = "";
@@ -191,14 +241,14 @@ function barre(id, chiave, extra){
       exCell = !prima ? `<span class="v ex nd">${ora ? "nuovi" : "nessuno"}</span>`
                       : `<span class="v ex ${cls(var12(s, U))}">${pct(var12(s, U))}</span>`;
     }
-    h += `<div class="riga${r.i === sel ? " sel" : ""}" data-i="${r.i}" role="button" tabindex="0" aria-label="${r.n}: ${num(r.v)} copie">
+    h += `<div class="riga" data-i="${r.i}" role="button" tabindex="0" aria-pressed="false" aria-label="${r.n}: ${num(r.v)} copie">
       <span class="n"><em>${r.n}</em></span>
       <span class="b"><i style="--p:${(r.v / max).toFixed(4)}"></i><span>${num(r.v)}</span></span>
       <span class="v ${cls(r.d)}">${r.d == null ? "n.d." : pct(r.d)}</span>${exCell}</div>`;
   }
   box.innerHTML = h;
-  box.addEventListener("click", e => { const r = e.target.closest(".riga"); if (r) scegli(+r.dataset.i); });
-  box.addEventListener("keydown", e => { const r = e.target.closest(".riga"); if (r && (e.key === "Enter" || e.key === " ")) { e.preventDefault(); scegli(+r.dataset.i); } });
+  box.addEventListener("click", e => { const r = e.target.closest(".riga"); if (r) alterna(+r.dataset.i); });
+  box.addEventListener("keydown", e => { const r = e.target.closest(".riga"); if (r && (e.key === "Enter" || e.key === " ")) { e.preventDefault(); alterna(+r.dataset.i); } });
 
   // totale delle testate presenti in entrambi gli anni
   let a = 0, b = 0;
@@ -212,59 +262,62 @@ barre("barre-d30", "d30", "ss");
 /* ---------- andamento nel tempo ---------- */
 const date = D.mesi.map(s => { const [y, m] = s.split("-").map(Number); return new Date(y, m - 1, 1); });
 
-function numeri(t){
-  const blocco = (v, d, etich, colore) => `<div class="numero"><div class="v">${v == null ? "–" : num(v)}</div>
-    <div class="l"><i style="background:${colore}"></i>${etich}, ${meseCorto(U)}</div>
-    <div class="d ${cls(d)}">${d == null ? "" : pct(d) + " in un anno"}</div></div>`;
-  document.getElementById("numeri").innerHTML =
-    blocco(t.ip[U], var12(t.ip, U), "individuale pagata", "var(--azzurro)") +
-    blocco(t.d30[U], var12(t.d30, U), "digitali ≥30% del prezzo", "var(--azzurro)") +
-    (t.ss[U] ? blocco(t.ss[U], var12(t.ss, U), "digitali superscontati", "var(--cat5)") : "");
+// somma di tutti i giornali dell'elenco, mese per mese
+const TOT = {n: "Tutti i giornali dell’elenco"};
+for (const k of ["ip", "d30", "ss"])
+  TOT[k] = D.mesi.map((_, i) => D.testate.reduce((s, t) => s + (t[k][i] || 0), 0));
+
+function serieAttive(){
+  return sel.length ? sel.map(i => ({t: D.testate[i], colore: colore(i)}))
+                    : [{t: TOT, colore: "var(--azzurro)"}];
 }
 
-function linee(id, serie){
-  // serie: [{k, valori, classe, etichetta, colore}]
+function numeri(attive){
+  const box = document.getElementById("numeri");
+  if (attive.length === 1){
+    const t = attive[0].t, c = attive[0].colore;
+    const blocco = (v, d, etich) => `<div class="numero"><div class="v">${v == null ? "–" : num(v)}</div>
+      <div class="l"><i style="background:${c}"></i>${etich}, ${meseCorto(U)}</div>
+      <div class="d ${cls(d)}">${d == null ? "" : pct(d) + " in un anno"}</div></div>`;
+    box.innerHTML = blocco(t.ip[U], var12(t.ip, U), "individuale pagata") +
+      blocco(t.d30[U], var12(t.d30, U), "digitali ≥30% del prezzo") +
+      blocco(t.ss[U], var12(t.ss, U), "digitali superscontati");
+  } else {
+    box.innerHTML = "";   // con più giornali la legenda sono le etichette colorate in alto
+  }
+}
+
+function linee(id, chiave, attive){
   const box = document.getElementById(id);
   box.innerHTML = "";
   const W = box.clientWidth, H = box.clientHeight;
   const mob = W < 480;
-  const m = {t: 10, r: mob ? 12 : 18, b: 26, l: mob ? 50 : 58};
+  const m = {t: 10, r: mob ? 12 : 18, b: 26, l: 0};
+  const serie = attive.map(a => ({valori: a.t[chiave], colore: a.colore, nome: a.t.n}));
   const tutti = serie.flatMap(s => s.valori.filter(v => v != null));
-  if (!tutti.length){ box.innerHTML = '<p class="ilpost-note">Nessun dato.</p>'; return; }
-  const x = d3.scaleTime().domain([date[0], date[U]]).range([m.l, W - m.r]);
+  if (!tutti.length || d3.max(tutti) === 0){ box.innerHTML = '<p class="ilpost-note">Nessuna copia in questa categoria.</p>'; box.style.height = "auto"; return; }
+  box.style.height = "";
   const y = d3.scaleLinear().domain([0, d3.max(tutti) * 1.08]).nice(mob ? 4 : 5).range([H - m.b, m.t]);
+  // margine sinistro adatto all'etichetta più lunga (12 px in Roboto Mono ≈ 7,3 px per carattere)
+  m.l = 12 + 7.3 * d3.max(y.ticks(mob ? 4 : 5), v => num(v).length);
+  const x = d3.scaleTime().domain([date[0], date[U]]).range([m.l, W - m.r]);
   const svg = d3.select(box).append("svg").attr("width", W).attr("height", H).attr("viewBox", `0 0 ${W} ${H}`)
-    .attr("role", "img").attr("aria-label", serie.map(s => s.etichetta).join(" e "));
+    .attr("role", "img").attr("aria-label", serie.map(s => s.nome).join(", "));
   svg.append("g").attr("class", "grid").selectAll("line").data(y.ticks(mob ? 4 : 5).filter(v => v > 0)).join("line")
     .attr("x1", m.l).attr("x2", W - m.r).attr("y1", y).attr("y2", y);
   svg.append("g").attr("class", "ax").attr("transform", `translate(${m.l},0)`)
-    .call(d3.axisLeft(y).ticks(mob ? 4 : 5).tickSize(0).tickPadding(8).tickFormat(v => nf.format(v)))
+    .call(d3.axisLeft(y).ticks(mob ? 4 : 5).tickSize(0).tickPadding(8).tickFormat(v => num(v)))
     .select(".domain").remove();
   const anni = d3.timeYear.range(date[0], d3.timeMonth.offset(date[U], 1));
   svg.append("g").attr("class", "ax").attr("transform", `translate(0,${H - m.b})`)
     .call(d3.axisBottom(x).tickValues(anni).tickSize(4).tickPadding(6).tickFormat(d => d.getFullYear()));
 
+  const gen = d3.line().defined(v => v != null).x((v, i) => x(date[i])).y(v => y(v));
+  for (const s of serie) svg.append("path").attr("class", "alone").attr("d", gen(s.valori));
   for (const s of serie){
-    const gen = d3.line().defined(v => v != null).x((v, i) => x(date[i])).y(v => y(v));
-    svg.append("path").attr("class", "alone").attr("d", gen(s.valori));
-    svg.append("path").attr("class", s.classe).attr("d", gen(s.valori));
-    const ui = s.valori.length - 1 - [...s.valori].reverse().findIndex(v => v != null);
-    if (ui < s.valori.length && s.valori[ui] != null){
-      svg.append("circle").attr("class", "ultimo").attr("cx", x(date[ui])).attr("cy", y(s.valori[ui])).attr("r", 5)
-        .style("stroke", s.colore);
-    }
-  }
-  // etichette dirette solo se ci sono due linee
-  if (serie.length > 1){
-    // la linea più alta ha l'etichetta sopra, quella più bassa sotto: così non si sovrappongono
-    const ord = serie.filter(s => s.valori[U] != null).sort((a, b) => b.valori[U] - a.valori[U]);
-    ord.forEach((s, k) => {
-      const yy = y(s.valori[U]);
-      const sotto = k > 0 && Math.abs(y(ord[k-1].valori[U]) - yy) < 34;
-      svg.append("text").attr("class", "etich").attr("x", W - m.r - 10)
-        .attr("y", Math.min(H - m.b - 4, sotto ? yy + 20 : yy - 11)).attr("text-anchor", "end")
-        .style("fill", s.colore).text(s.etichetta);
-    });
+    svg.append("path").attr("class", "l-princ").style("stroke", s.colore).attr("d", gen(s.valori));
+    const v = s.valori[U];
+    if (v != null) svg.append("circle").attr("class", "ultimo").attr("cx", x(date[U])).attr("cy", y(v)).attr("r", 5).style("stroke", s.colore);
   }
 
   // interazione: mouse e dito
@@ -279,11 +332,13 @@ function linee(id, serie){
     guida.attr("x1", xi).attr("x2", xi).attr("opacity", 1);
     punti.selectAll("*").remove();
     let h = `<b>${meseLungo(i)}</b>`;
-    for (const s of serie){
+    for (const s of [...serie].sort((a, b) => (b.valori[i] ?? -1) - (a.valori[i] ?? -1))){
       const v = s.valori[i]; if (v == null) continue;
       punti.append("circle").attr("cx", xi).attr("cy", y(v)).attr("r", 4).style("fill", s.colore);
       const d = var12(s.valori, i);
-      h += `<div><span class="mono">${num(v)}</span> <span class="m">${s.etichetta}</span>${d == null ? "" : ` <span class="mono ${cls(d)}">${pct(d)}</span>`}</div>`;
+      h += `<div><i style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${s.colore};margin-right:5px"></i>`
+        + (serie.length > 1 ? `<span class="m">${s.nome}</span> ` : "")
+        + `<span class="mono">${num(v)}</span>${d == null ? "" : ` <span class="mono ${cls(d)}">${pct(d)}</span>`}</div>`;
     }
     tip.innerHTML = h + `<div class="m">variazione su un anno prima</div>`;
     tip.style.borderLeftColor = serie[0].colore;
@@ -298,17 +353,23 @@ function linee(id, serie){
 }
 
 function tempo(){
-  const t = D.testate[sel];
-  document.getElementById("tit-tempo").textContent = `Com’è andato ${t.n} dal 2021`;
-  numeri(t);
-  const AZ = "var(--azzurro)", GR = "var(--cat5)";
-  linee("linee-ip", [{valori: t.ip, classe: "l-princ", etichetta: "individuale pagata", colore: AZ}]);
-  const s = [{valori: t.d30, classe: "l-princ", etichetta: "≥30% del prezzo", colore: AZ}];
-  if (t.ss.some(v => v)) s.push({valori: t.ss, classe: "l-sec", etichetta: "superscontati (10-30%)", colore: GR});
-  linee("linee-d30", s);
+  const attive = serieAttive();
+  document.getElementById("tit-tempo").textContent =
+    !sel.length ? "Com’è andata dal 2021"
+    : sel.length === 1 ? `Com’è andato ${D.testate[sel[0]].n} dal 2021`
+    : "Com’è andata dal 2021, giornale per giornale";
+  document.getElementById("lead-tempo").textContent = !sel.length
+    ? "Media giornaliera mese per mese, somma di tutti i giornali dell’elenco. Evidenzia uno o più giornali per vederne l’andamento; tocca o passa sopra le linee per leggere i valori."
+    : "Media giornaliera mese per mese, da gennaio 2021. Tocca o passa sopra le linee per leggere i valori.";
+  numeri(attive);
+  linee("linee-ip", "ip", attive);
+  linee("linee-d30", "d30", attive);
+  linee("linee-ss", "ss", attive);
 }
-tempo();
-let rt; new ResizeObserver(() => { clearTimeout(rt); rt = setTimeout(tempo, 80); }).observe(document.getElementById("sez-tempo"));
+aggiorna();
+let rt, larg = 0;
+new ResizeObserver(([e]) => { const w = e.contentRect.width; if (w === larg) return; larg = w; clearTimeout(rt); rt = setTimeout(tempo, 80); })
+  .observe(document.getElementById("sez-tempo"));
 </script>
 </body>
 </html>

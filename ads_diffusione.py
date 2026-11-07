@@ -7,7 +7,7 @@ nello stile dei grafici del Post, con:
    vendute ad almeno il 30% del prezzo (colonne 2+3+4a; esclusa la 4b, digitali tra il 10 e il 30%)
 2. Sole copie digitali individuali vendute ad almeno il 30% del prezzo ufficiale (colonna 4a),
    con la variazione degli abbonamenti superscontati (colonna 4b)
-3. L'andamento nel tempo di queste serie, da gennaio 2021, per il giornale scelto
+3. L'andamento nel tempo di queste serie, da gennaio 2021: il totale, o i giornali scelti (fino a sei)
 
 Sono esclusi i quotidiani sportivi (Gazzetta dello Sport, Corriere dello Sport, Tuttosport).
 
@@ -64,9 +64,6 @@ SERIE = {
 
 # Quotidiani sportivi (e loro edizioni del lunedì) esclusi
 ESCLUDI = re.compile(r"GAZZETTA SPORT|CORRIERE SPORT|TUTTOSPORT", re.IGNORECASE)
-
-# Giornale mostrato all'apertura della pagina
-PREDEFINITO = "CORRIERE DELLA SERA"
 
 # Nomi da mostrare quando la regola generale (vedi nome_leggibile) non basta
 NOMI = {
@@ -196,9 +193,8 @@ def dati_pagina(df: pd.DataFrame, fino_a: tuple[int, int]) -> dict:
             s = d[k].reindex(chiavi)
             voce[k] = [None if pd.isna(v) else int(v) for v in s]
         testate.append(voce)
-    pred = next((i for i, t in enumerate(testate) if t["raw"] == PREDEFINITO), 0)
     oggi = date.today()
-    return {"mesi": chiavi, "testate": testate, "predefinito": pred,
+    return {"mesi": chiavi, "testate": testate,
             "aggiornato": f"{oggi.day} {MESI[oggi.month]} {oggi.year}"}
 
 
