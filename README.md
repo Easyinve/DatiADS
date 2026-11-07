@@ -6,7 +6,7 @@ Ogni mese scarica da [ADS](https://www.adsnotizie.it/Dati/DMS_Page) i dati DMS d
 - **Copie digitali vendute ad almeno il 30% del prezzo** (col. 4a), con accanto la variazione degli abbonamenti superscontati (10-30% del prezzo, col. 4b)
 - **Andamento nel tempo** da gennaio 2021, con un grafico a linee per la diffusione individuale pagata, uno per i digitali ad almeno il 30% e uno per i superscontati
 
-All'apertura nessun giornale è evidenziato e i grafici a linee mostrano il totale. Con la ricerca (o toccando le barre) si possono evidenziare fino a sei giornali, ognuno con il suo colore in tutti i grafici. Sono esclusi i quotidiani sportivi.
+All'apertura nessun giornale è evidenziato e i grafici a linee mostrano il totale. Con la ricerca (o toccando le barre) si possono evidenziare fino a sei giornali, ognuno con il suo colore in tutti i grafici. Le barre mostrano i primi 10 giornali; un pulsante apre l’elenco completo. Sono esclusi i quotidiani sportivi.
 
 ## File prodotti
 

@@ -58,6 +58,12 @@ body{font-family:var(--sans)}
 .riga.sel .n{font-weight:700}
 .riga.sel .n em{font-style:normal;background:var(--giallo);color:var(--su-giallo);padding:0 3px}
 .riga:hover .n{text-decoration:underline;text-decoration-color:var(--asse)}
+/* primi 10; gli altri compaiono col pulsante (i giornali evidenziati si vedono sempre) */
+.riga.extra{display:none}
+.aperto .riga.extra,.riga.extra.sel{display:grid}
+.evid-box:not(.aperto) .riga.extra.sel{border-top:1px dashed var(--asse);margin-top:-1px}
+.mostra{display:block;width:100%;margin:10px 0 0;cursor:pointer;color:var(--ink) !important;font-size:14px !important}
+.mostra:hover{border-color:var(--asse)}
 .totale{font-size:13px;color:var(--testo);margin:10px 0 0}
 .totale b{font-family:var(--mono);font-weight:500}
 
@@ -234,20 +240,34 @@ function barre(id, chiave, extra){
   const box = document.getElementById(id);
   box.classList.add("evid-box");   // le altre barre si attenuano solo quando c'è almeno un giornale scelto
   let h = `<div class="intest"><span>Giornale</span><span>Copie al giorno</span><span>vs ${MESI[(+D.mesi[U].slice(5))-1]} ${+D.mesi[U].slice(0,4)-1}</span>${extra ? "<span>super-<br>scontati</span>" : ""}</div>`;
-  for (const r of righe){
+  const PRIMI = 10;
+  for (const [k, r] of righe.entries()){
     let exCell = "";
     if (extra){
       const s = r.ex, ora = s[U], prima = s[U-12];
       exCell = !prima ? `<span class="v ex nd">${ora ? "nuovi" : "nessuno"}</span>`
                       : `<span class="v ex ${cls(var12(s, U))}">${pct(var12(s, U))}</span>`;
     }
-    h += `<div class="riga" data-i="${r.i}" role="button" tabindex="0" aria-pressed="false" aria-label="${r.n}: ${num(r.v)} copie">
+    h += `<div class="riga${k >= PRIMI ? " extra" : ""}" data-i="${r.i}" role="button" tabindex="0" aria-pressed="false" aria-label="${r.n}: ${num(r.v)} copie">
       <span class="n"><em>${r.n}</em></span>
       <span class="b"><i style="--p:${(r.v / max).toFixed(4)}"></i><span>${num(r.v)}</span></span>
       <span class="v ${cls(r.d)}">${r.d == null ? "n.d." : pct(r.d)}</span>${exCell}</div>`;
   }
+  const etichMostra = aperto => aperto ? `Mostra solo i primi ${PRIMI}` : `Mostra tutti i ${righe.length} giornali`;
+  if (righe.length > PRIMI)
+    h += `<button type="button" class="mostra" aria-expanded="false">${etichMostra(false)}</button>`;
   box.innerHTML = h;
-  box.addEventListener("click", e => { const r = e.target.closest(".riga"); if (r) alterna(+r.dataset.i); });
+  box.addEventListener("click", e => {
+    const b = e.target.closest(".mostra");
+    if (b){
+      const aperto = box.classList.toggle("aperto");
+      b.textContent = etichMostra(aperto);
+      b.setAttribute("aria-expanded", aperto);
+      if (!aperto) box.closest(".sezione").scrollIntoView({block: "start"});   // richiudendo, si torna all'inizio del grafico
+      return;
+    }
+    const r = e.target.closest(".riga"); if (r) alterna(+r.dataset.i);
+  });
   box.addEventListener("keydown", e => { const r = e.target.closest(".riga"); if (r && (e.key === "Enter" || e.key === " ")) { e.preventDefault(); alterna(+r.dataset.i); } });
 
   // totale delle testate presenti in entrambi gli anni
