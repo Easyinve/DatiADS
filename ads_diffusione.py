@@ -48,6 +48,7 @@ COL_MESE = 6
 COL_CARTACEE = 10        # 2  – Vendite individuali cartacee
 COL_ABB_CARTACEI = 11    # 3  – Abbonamenti individuali cartacei pagati
 COL_DIGITALI_30 = 12     # 4a – Vendite copie digitali individuali >= 30% del prezzo
+COL_DIGITALI_10_30 = 13  # 4b – Vendite copie digitali individuali tra il 10 e il 30% ("superscontate")
 HEADER_ROWS = 4
 
 # Quotidiani sportivi (e loro edizioni del lunedì) esclusi dai grafici
@@ -67,8 +68,14 @@ METRICHE = {
         "titolo": "Copie digitali individuali vendute ad almeno il 30% del prezzo",
         "sottotitolo": "Esclusi gli abbonamenti digitali venduti a meno del 30% del prezzo ufficiale (col. 4a ADS)",
         "colore": "#e07b39",
+        # colonna aggiuntiva con la variazione degli abbonamenti superscontati
+        "extra": ("superscontati", "superscontati\n(10-30%)"),
     },
 }
+
+# Serie calcolate solo per confronto (non hanno un grafico proprio)
+SERIE_EXTRA = {"superscontati": [COL_DIGITALI_10_30]}
+SERIE = {**{k: v["cols"] for k, v in METRICHE.items()}, **SERIE_EXTRA}
 
 
 def ultimo_mese_disponibile() -> tuple[int, int]:
@@ -110,8 +117,8 @@ def leggi(path: Path, mese: int, anno: int) -> pd.DataFrame:
     df = df[~df[COL_TESTATA].astype(str).str.contains(ESCLUDI)]
     out = pd.DataFrame({
         "testata": df[COL_TESTATA].astype(str).str.strip(),
-        **{k: df[v["cols"]].apply(pd.to_numeric, errors="coerce").sum(axis=1, min_count=1)
-           for k, v in METRICHE.items()},
+        **{k: df[cols].apply(pd.to_numeric, errors="coerce").sum(axis=1, min_count=1)
+           for k, cols in SERIE.items()},
     })
     if out.empty:
         raise RuntimeError(f"Nessuna riga per {mese}/{anno} in {path.name}")
@@ -122,7 +129,7 @@ def confronta(mese: int, anno: int, force: bool) -> pd.DataFrame:
     cur = leggi(scarica(mese, anno, force), mese, anno)
     prev = leggi(scarica(mese, anno - 1, force), mese, anno - 1)
     df = cur.merge(prev, on="testata", how="left", suffixes=("", "_prec"))
-    for k in METRICHE:
+    for k in SERIE:
         prec = df[f"{k}_prec"].where(df[f"{k}_prec"] > 0)
         df[f"{k}_var"] = (df[k] / prec - 1) * 100
     return df
@@ -142,20 +149,36 @@ def grafico(df: pd.DataFrame, chiave: str, mese: int, anno: int) -> Path:
     ax.set_yticks(list(y), d["testata"], fontsize=8.5)
     ax.set_ylim(-0.6, n - 0.4)
     xmax = d[chiave].max()
-    ax.set_xlim(0, xmax * 1.32)
+    extra = cfg.get("extra")
+    x_var = xmax * 1.31
+    x_extra = xmax * 1.50
+    ax.set_xlim(0, (x_extra if extra else x_var) + xmax * 0.01)
 
-    for yi, (val, var) in enumerate(zip(d[chiave], d[f"{chiave}_var"])):
-        ax.text(val + xmax * 0.01, yi, fmt_int(val), va="center", fontsize=8)
+    def scrivi_var(x, yi, var, bold=True):
         if pd.isna(var):
             txt, col = "n.d.", "#888888"
         else:
             txt = f"{var:+.1f}%".replace(".", ",")
             col = "#1a8f3c" if var >= 0 else "#c62828"
-        ax.text(xmax * 1.31, yi, txt, va="center", ha="right", fontsize=8,
-                color=col, fontweight="bold")
+        ax.text(x, yi, txt, va="center", ha="right", fontsize=8, color=col,
+                fontweight="bold" if bold else "normal")
 
-    ax.text(xmax * 1.31, n - 0.2, f"vs {MESI[mese][:3]} {anno - 1}", ha="right",
+    for yi, (_, r) in enumerate(d.iterrows()):
+        ax.text(r[chiave] + xmax * 0.01, yi, fmt_int(r[chiave]), va="center", fontsize=8)
+        scrivi_var(x_var, yi, r[f"{chiave}_var"])
+        if extra:
+            k = extra[0]
+            if not r[f"{k}_prec"]:
+                ax.text(x_extra, yi, "nuovo" if r[k] else "nessuno", va="center", ha="right",
+                        fontsize=7.5, color="#888888", style="italic")
+            else:
+                scrivi_var(x_extra, yi, r[f"{k}_var"], bold=False)
+
+    ax.text(x_var, n - 0.2, f"vs {MESI[mese][:3]} {anno - 1}", ha="right",
             va="bottom", fontsize=8, color="#555555")
+    if extra:
+        ax.text(x_extra, n - 0.2, f"{extra[1]}\nvs {MESI[mese][:3]} {anno - 1}", ha="right",
+                va="bottom", fontsize=7.5, color="#555555", linespacing=1.1)
 
     tot, tot_prec = d[chiave].sum(), df.loc[d.index, f"{chiave}_prec"].sum()
     var_tot = (tot / tot_prec - 1) * 100 if tot_prec else float("nan")
@@ -168,6 +191,9 @@ def grafico(df: pd.DataFrame, chiave: str, mese: int, anno: int) -> Path:
     ax.spines[["top", "right"]].set_visible(False)
     ax.xaxis.set_major_formatter(matplotlib.ticker.FuncFormatter(lambda v, _: fmt_int(v)))
     ax.tick_params(axis="x", labelsize=8)
+    # l'asse si ferma sotto le barre, non sotto le colonne delle variazioni
+    ax.set_xticks([t for t in ax.get_xticks() if 0 <= t <= xmax * 1.08])
+    ax.spines["bottom"].set_bounds(0, xmax * 1.08)
     ax.grid(axis="x", alpha=0.3)
     ax.set_axisbelow(True)
     fig.text(0.02, 0.005, "Fonte: ADS – Accertamenti Diffusione Stampa, dati DMS. "
