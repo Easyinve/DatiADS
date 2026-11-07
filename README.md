@@ -2,11 +2,11 @@
 
 Ogni mese scarica da [ADS](https://www.adsnotizie.it/Dati/DMS_Page) i dati DMS dei quotidiani e genera due grafici in `grafici/`:
 
-- **`AAAA_MM_individuale_pagata.png`**: diffusione media giornaliera individuale pagata (col. 5 ADS) e variazione % sullo stesso mese dell'anno precedente
+- **`AAAA_MM_individuale_pagata.png`**: diffusione media giornaliera individuale pagata (cartacee + abbonamenti cartacei + digitali vendute ad almeno il 30% del prezzo, col. 2+3+4a ADS) e variazione % sullo stesso mese dell'anno precedente
 - **`AAAA_MM_digitale_30.png`**: sole copie digitali individuali vendute ad almeno il 30% del prezzo ufficiale (col. 4a ADS)
 - **`AAAA_MM_dati.csv`**: i numeri usati nei grafici
 
-Gli Excel originali vengono salvati in `dati/`.
+Sono esclusi i quotidiani sportivi. Gli Excel originali vengono salvati in `dati/`.
 
 ## Esecuzione automatica
 

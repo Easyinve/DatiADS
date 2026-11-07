@@ -2,8 +2,11 @@
 """
 Scarica i dati mensili ADS (DMS) dei quotidiani da adsnotizie.it e produce due grafici:
 
-1. Diffusione media giornaliera "individuale pagata" (Totale vendite individuali, colonna 5 = 2+3+4)
+1. Diffusione media giornaliera "individuale pagata": cartacee + abbonamenti cartacei + copie digitali
+   vendute ad almeno il 30% del prezzo (colonne 2+3+4a; esclusa la 4b, digitali tra il 10 e il 30%)
 2. Sole copie digitali individuali vendute ad almeno il 30% del prezzo ufficiale (colonna 4a)
+
+Sono esclusi i quotidiani sportivi (Gazzetta dello Sport, Corriere dello Sport, Tuttosport).
 
 Per ogni testata mostra il dato del mese e la variazione % rispetto allo stesso mese dell'anno prima.
 
@@ -42,19 +45,25 @@ MESI = ["", "gennaio", "febbraio", "marzo", "aprile", "maggio", "giugno", "lugli
 COL_TESTATA = 0
 COL_ANNO = 5
 COL_MESE = 6
-COL_DIGITALI_30 = 12      # 4a – Vendite copie digitali individuali >= 30% del prezzo
-COL_TOT_INDIVIDUALI = 14  # 5  – Totale vendite individuali (2+3+4)
+COL_CARTACEE = 10        # 2  – Vendite individuali cartacee
+COL_ABB_CARTACEI = 11    # 3  – Abbonamenti individuali cartacei pagati
+COL_DIGITALI_30 = 12     # 4a – Vendite copie digitali individuali >= 30% del prezzo
 HEADER_ROWS = 4
+
+# Quotidiani sportivi (e loro edizioni del lunedì) esclusi dai grafici
+ESCLUDI = re.compile(r"GAZZETTA SPORT|CORRIERE SPORT|TUTTOSPORT", re.IGNORECASE)
 
 METRICHE = {
     "individuale_pagata": {
-        "col": COL_TOT_INDIVIDUALI,
+        # 2 + 3 + 4a: escluse le copie digitali vendute tra il 10% e il 30% del prezzo (4b)
+        "cols": [COL_CARTACEE, COL_ABB_CARTACEI, COL_DIGITALI_30],
         "titolo": "Diffusione media giornaliera individuale pagata",
-        "sottotitolo": "Cartacea + digitale, vendite individuali pagate dall'acquirente (col. 5 ADS)",
+        "sottotitolo": "Cartacee + abbonamenti cartacei + digitali vendute ad almeno il 30% del prezzo "
+                       "(col. 2+3+4a ADS)",
         "colore": "#1f6fb4",
     },
     "digitale_30": {
-        "col": COL_DIGITALI_30,
+        "cols": [COL_DIGITALI_30],
         "titolo": "Copie digitali individuali vendute ad almeno il 30% del prezzo",
         "sottotitolo": "Esclusi gli abbonamenti digitali venduti a meno del 30% del prezzo ufficiale (col. 4a ADS)",
         "colore": "#e07b39",
@@ -98,9 +107,11 @@ def leggi(path: Path, mese: int, anno: int) -> pd.DataFrame:
     df = df[df[COL_TESTATA].notna()]
     df = df[(pd.to_numeric(df[COL_ANNO], errors="coerce") == anno)
             & (pd.to_numeric(df[COL_MESE], errors="coerce") == mese)]
+    df = df[~df[COL_TESTATA].astype(str).str.contains(ESCLUDI)]
     out = pd.DataFrame({
         "testata": df[COL_TESTATA].astype(str).str.strip(),
-        **{k: pd.to_numeric(df[v["col"]], errors="coerce") for k, v in METRICHE.items()},
+        **{k: df[v["cols"]].apply(pd.to_numeric, errors="coerce").sum(axis=1, min_count=1)
+           for k, v in METRICHE.items()},
     })
     if out.empty:
         raise RuntimeError(f"Nessuna riga per {mese}/{anno} in {path.name}")
